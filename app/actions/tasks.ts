@@ -30,13 +30,15 @@ export async function createTask(input: CreateTaskInput): Promise<TaskResult> {
     }
 
     // Check for duplicate task
+    const dateStr = input.taskDate.toISOString().split('T')[0];
     const existingTask = await db
       .select()
       .from(tasks)
       .where(and(
         eq(tasks.userId, MOCK_USER_ID),
         eq(tasks.title, input.title),
-        sql`${tasks.taskDate} = ${input.taskDate.toISOString()}`
+        eq(tasks.typeId, input.typeId), // Only block if same title AND same type
+        sql`DATE(${tasks.taskDate}) = DATE(${dateStr})`
       ))
       .limit(1);
 
@@ -183,6 +185,45 @@ export async function toggleTask(taskId: string) {
   } catch (error) {
     console.error('Failed to toggle task:', error);
     return { success: false, error: 'Failed to update task' };
+  }
+}
+
+export async function deleteTask(taskId: string) {
+  try {
+    // Verify task exists and belongs to user
+    const [taskToDelete] = await db
+      .select()
+      .from(tasks)
+      .where(and(
+        eq(tasks.id, taskId),
+        eq(tasks.userId, MOCK_USER_ID)
+      ))
+      .limit(1);
+
+    if (!taskToDelete) {
+      return { success: false, error: 'Task not found' };
+    }
+
+    // Delete the task
+    await db
+      .delete(tasks)
+      .where(and(
+        eq(tasks.id, taskId),
+        eq(tasks.userId, MOCK_USER_ID)
+      ));
+
+    // Revalidate dashboard cache
+    revalidatePath('/dashboard');
+    revalidatePath('/tasks');
+
+    return { 
+      success: true, 
+      message: 'Task deleted successfully',
+      deletedTaskId: taskId
+    };
+  } catch (error) {
+    console.error('Failed to delete task:', error);
+    return { success: false, error: 'Failed to delete task' };
   }
 }
 
