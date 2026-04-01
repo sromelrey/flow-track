@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 import { TaskForm } from '@/components/TaskForm';
-import { getTasksByDate, toggleTask } from '@/app/actions/tasks';
+import { getTasksByDate, toggleTask, deleteTask } from '@/app/actions/tasks';
 import { Task } from '@/lib/types';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 const getCategoryColor = (category: string): string => {
   switch (category) {
@@ -27,6 +28,9 @@ const getCategoryColor = (category: string): string => {
 export function TaskList() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Calculate completed tasks
   const completedCount = tasks.filter(task => task.completed).length;
@@ -97,13 +101,51 @@ export function TaskList() {
     }
   };
 
+  const handleDeleteClick = (taskId: string) => {
+    setTaskToDelete(taskId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!taskToDelete) return;
+    
+    setIsDeleting(true);
+    const result = await deleteTask(taskToDelete);
+    
+    if (result.success) {
+      // Remove task from local state with animation
+      setTasks(prevTasks => {
+        const taskElement = document.getElementById(`task-${taskToDelete}`);
+        if (taskElement) {
+          taskElement.style.opacity = '0';
+          taskElement.style.transform = 'translateX(20px)';
+          taskElement.style.transition = 'all 0.3s ease-out';
+        }
+        
+        setTimeout(() => {
+          setTasks(current => current.filter(task => task.id !== taskToDelete));
+        }, 300);
+        
+        return prevTasks;
+      });
+      
+      toast.success('Task deleted successfully');
+      setDeleteDialogOpen(false);
+    } else {
+      toast.error(result.error || 'Failed to delete task');
+    }
+    
+    setIsDeleting(false);
+    setTaskToDelete(null);
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg border border-gray-200">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Today&apos;s Tasks</h3>
       
       {/* Task Form */}
       <div className="mb-6">
-        <TaskForm onTaskCreated={handleTaskCreated} />
+        <TaskForm onTaskCreated={handleTaskCreated} taskCount={totalCount} />
       </div>
       
       {/* Task Count and Progress */}
@@ -138,6 +180,7 @@ export function TaskList() {
           tasks.map((task) => (
             <div
               key={task.id}
+              id={`task-${task.id}`}
               onClick={() => handleToggleTask(task.id)}
               className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
                 task.completed 
@@ -167,14 +210,25 @@ export function TaskList() {
                 </p>
               </div>
               
-              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mr-2 ${
                 task.taskType ? '' : getCategoryColor('Personal')
               }`} style={{
                 backgroundColor: task.taskType ? `${task.taskType.color}20` : undefined,
-                color: task.taskType ? task.taskType.color : undefined
+                color: task.taskType ? task.taskType.color : undefined,
               }}>
                 {task.taskType?.name || 'Personal'}
               </span>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteClick(task.id);
+                }}
+                className="shrink-0 p-1 text-gray-400 hover:text-red-500 transition-colors"
+                aria-label="Delete task"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           ))
         )}
@@ -193,6 +247,18 @@ export function TaskList() {
           </p>
         </div>
       )}
+      
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Task"
+        description="Are you sure you want to delete this task? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleDeleteConfirm}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

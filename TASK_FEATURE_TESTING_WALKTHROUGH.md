@@ -3,9 +3,10 @@
 ## 🎯 Features to Test
 1. **Task Creation** - Create tasks with title and type
 2. **Task Toggle** - Mark tasks as complete/incomplete
-3. **Daily Limit** - Enforce 5-task maximum
-4. **Duplicate Prevention** - Block duplicate tasks
-5. **Progress Tracking** - Visual progress bar and counters
+3. **Task Deletion** - Delete tasks with confirmation dialog
+4. **Daily Limit** - Enforce 5-task maximum with UI disable
+5. **Duplicate Prevention** - Block duplicate tasks
+6. **Progress Tracking** - Visual progress bar and counters
 
 ---
 
@@ -101,32 +102,93 @@ Repeat for each type:
 
 ---
 
-### Test 3: Daily Limit Enforcement
+### Test 3: Task Deletion
 
-#### 3.1 Reach Daily Limit
+#### 3.1 Delete Single Task
+1. **Actions**:
+   - Create at least 1 task
+   - Click the trash icon next to any task
+2. **Expected Results**:
+   - ✅ Confirmation dialog appears with message: "Are you sure you want to delete this task? This action cannot be undone."
+   - ✅ Dialog has "Cancel" and "Delete" buttons
+   - ✅ Pressing Escape closes dialog
+   - ✅ Pressing Enter confirms deletion
+
+#### 3.2 Confirm Deletion
+1. **Actions**:
+   - Click "Delete" in confirmation dialog
+2. **Expected Results**:
+   - ✅ Task fades out with smooth animation (slides right and disappears)
+   - ✅ Success toast: "Task deleted successfully"
+   - ✅ Progress bar updates immediately
+   - ✅ Task count decreases
+
+#### 3.3 Cancel Deletion
+1. **Actions**:
+   - Click trash icon
+   - Click "Cancel" or press Escape
+2. **Expected**:
+   - ✅ Dialog closes
+   - ✅ Task remains unchanged
+   - ✅ No toast notification
+
+#### 3.4 Delete Multiple Tasks
+1. **Actions**:
+   - Create 3-4 tasks
+   - Delete them one by one
+2. **Expected**:
+   - ✅ Each deletion works independently
+   - ✅ Progress updates after each deletion
+   - ✅ Form re-enables when dropping below 5 tasks
+
+---
+
+### Test 4: Daily Limit Enforcement
+
+#### 4.1 Reach Daily Limit
 1. **Actions**:
    - Create 5 tasks (any types)
 2. **Expected Results**:
    - After 5th task: 📋 Amber message: "Daily task limit reached (5/5). Great job staying focused!"
    - Progress shows: "5/5 tasks completed (X%)"
 
-#### 3.2 Attempt to Create 6th Task
+#### 4.2 Form Disable at Limit
+1. **Expected UI Changes**:
+   - ✅ Input field shows: "Daily limit reached (5/5)"
+   - ✅ Input field is disabled (grayed out, not editable)
+   - ✅ Type selector dropdown is disabled
+   - ✅ Add button is disabled
+   - ✅ "5/5 tasks" overlay appears on input
+   - ✅ Hovering disabled button shows tooltip: "Daily limit reached (5 tasks)"
+
+#### 4.3 Attempt to Create 6th Task
 1. **Actions**:
-   - Try to create another task
-2. **Expected**: ❌ Red toast: "Maximum 5 tasks allowed per day"
-3. **Expected**: Task is NOT created
+   - Try to type in disabled input
+   - Try to click add button
+2. **Expected**:
+   - ✅ Cannot type in input
+   - ✅ Button doesn't respond
+   - ✅ No error toast (form is disabled, not error)
+
+#### 4.4 Re-enable After Deletion
+1. **Actions**:
+   - At 5 tasks limit, delete 1 task
+2. **Expected**:
+   - ✅ Form immediately re-enables
+   - ✅ Placeholder returns to "Add a task... (Press Enter)"
+   - ✅ All controls become active again
 
 ---
 
-### Test 4: Duplicate Prevention
+### Test 5: Duplicate Prevention
 
-#### 4.1 Create Duplicate Task
+#### 5.1 Create Duplicate Task
 1. **Actions**:
    - Create task: "Test task" (type: Dev)
    - Try to create same task again: "Test task" (type: Dev)
 2. **Expected**: ❌ Red toast: "Task already exists for this date"
 
-#### 4.2 Same Title, Different Type
+#### 5.2 Same Title, Different Type
 1. **Actions**:
    - Create "Exercise" (type: Health)
    - Create "Exercise" (type: Personal)
@@ -134,16 +196,16 @@ Repeat for each type:
 
 ---
 
-### Test 5: Progress Tracking
+### Test 6: Progress Tracking
 
-#### 5.1 Empty State
+#### 6.1 Empty State
 1. **Actions**:
    - Delete all tasks (or wait for next day)
 2. **Expected**: 
    - Message: "No tasks for today. Add one above!"
    - No progress bar shown
 
-#### 5.2 Progress Animation
+#### 6.2 Progress Animation
 1. **Actions**:
    - Create tasks one by one
    - Toggle completion
@@ -154,11 +216,11 @@ Repeat for each type:
 
 ---
 
-## �️ Database Retrieval Tests
+## 🗄️ Database Retrieval Tests
 
-### Test 6: Task Persistence & Retrieval
+### Test 7: Task Persistence & Retrieval
 
-#### 6.1 Verify Tasks Persist After Refresh
+#### 7.1 Verify Tasks Persist After Refresh
 1. **Actions**:
    - Create 2-3 tasks with different types
    - Toggle one task to complete
@@ -169,7 +231,7 @@ Repeat for each type:
    - ✅ Progress bar shows correct state
    - ✅ Task types and colors preserved
 
-#### 6.2 Check Database Directly
+#### 7.2 Check Database Directly
 1. **Open**: `http://localhost:3000/api/debug/tasks`
 2. **Expected**: 
    ```json
@@ -198,7 +260,7 @@ Repeat for each type:
    - Refresh the debug endpoint
    - Task should appear in the list
 
-#### 6.3 Test Date-Specific Retrieval
+#### 7.3 Test Date-Specific Retrieval
 1. **Actions**:
    - Note today's date
    - Create a task
@@ -207,7 +269,7 @@ Repeat for each type:
    - Tasks only show for the current date
    - Previous day's tasks don't appear (each day is fresh)
 
-#### 6.4 Verify Real-time Updates
+#### 7.4 Verify Real-time Updates
 1. **Actions**:
    - Open dashboard in two browser tabs
    - Create task in Tab A
@@ -271,18 +333,21 @@ Open DevTools (F12) and watch for:
 ### Must Pass
 - [ ] Create tasks with all 4 types
 - [ ] Toggle task completion
-- [ ] See progress updates
+- [ ] Delete tasks with confirmation
+- [ ] See progress updates after deletion
 - [ ] Daily limit enforced (5 tasks)
+- [ ] Form disables at limit
 - [ ] Duplicates blocked
 - [ ] Toast notifications appear
 - [ ] No console errors
 
 ### Should Pass
-- [ ] Smooth animations
+- [ ] Smooth animations (fade out delete)
 - [ ] Responsive on mobile
-- [ ] Keyboard shortcuts work (Enter)
+- [ ] Keyboard shortcuts work (Enter, Escape)
 - [ ] Visual feedback on hover
 - [ ] Color coding consistent
+- [ ] Delete button accessible
 
 ---
 
@@ -352,10 +417,17 @@ Device: ___________
 
 ## 🚀 Next Features to Test
 
-After these tests pass, you're ready for:
-1. **Feature 1.3**: Delete Task
-2. **Feature 1.5**: Enhanced Daily Limit UI
-3. **Phase 2**: Dashboard Data Integration
+Phase 1 is now complete! ✅ All features implemented:
+- ✅ Feature 1.1: Create Task
+- ✅ Feature 1.2: Toggle Task Completion
+- ✅ Feature 1.3: Delete Task
+- ✅ Feature 1.4: Get Tasks by Date
+- ✅ Feature 1.5: Enhanced Daily Limit UI
+
+Ready for Phase 2: Dashboard Data Integration
+1. **Feature 2.1**: Daily Progress Calculation
+2. **Feature 2.2**: Weekly Progress Calculation
+3. **Feature 2.3**: Monthly Progress Calculation
 
 ---
 

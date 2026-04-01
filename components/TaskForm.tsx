@@ -16,15 +16,18 @@ import { TaskType } from '@/lib/types';
 import { toast } from 'sonner';
 
 interface TaskFormProps {
-  onTaskCreated?: () => void;
+  onTaskCreated: () => void;
+  taskCount?: number;
   className?: string;
 }
 
-export function TaskForm({ onTaskCreated, className }: TaskFormProps) {
+export function TaskForm({ onTaskCreated, taskCount = 0, className }: TaskFormProps) {
   const [title, setTitle] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+  
+  const isAtLimit = taskCount >= 5;
 
   // Load task types on mount
   useEffect(() => {
@@ -64,6 +67,11 @@ export function TaskForm({ onTaskCreated, className }: TaskFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isAtLimit) {
+      toast.error('Daily task limit reached (5 tasks)');
+      return;
+    }
     
     if (!title.trim()) {
       toast.error('Please enter a task title');
@@ -105,20 +113,29 @@ export function TaskForm({ onTaskCreated, className }: TaskFormProps) {
   return (
     <form onSubmit={handleSubmit} className={className}>
       <div className="flex gap-2">
-        <div className="flex-1">
+        <div className="flex-1 relative">
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Add a task... (Press Enter)"
+            placeholder={isAtLimit ? "Daily limit reached (5/5)" : "Add a task... (Press Enter)"}
             maxLength={100}
-            disabled={isSubmitting}
-            className="text-base"
+            disabled={isSubmitting || isAtLimit}
+            className={`text-base ${isAtLimit ? 'opacity-50 cursor-not-allowed' : ''}`}
           />
+          {isAtLimit && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-xs text-gray-500 bg-white px-2">5/5 tasks</span>
+            </div>
+          )}
         </div>
         
-        <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
-          <SelectTrigger className="w-[140px]">
+        <Select 
+          value={selectedTypeId} 
+          onValueChange={setSelectedTypeId}
+          disabled={isAtLimit}
+        >
+          <SelectTrigger className={`w-[140px] ${isAtLimit ? 'opacity-50 cursor-not-allowed' : ''}`}>
             <SelectValue placeholder="Type">
               {selectedTypeId && (
                 <div className="flex items-center gap-2">
@@ -153,7 +170,9 @@ export function TaskForm({ onTaskCreated, className }: TaskFormProps) {
         <Button 
           type="submit" 
           size="sm"
-          disabled={isSubmitting || !title.trim() || !selectedTypeId}
+          disabled={isSubmitting || !title.trim() || !selectedTypeId || isAtLimit}
+          className={isAtLimit ? 'opacity-50 cursor-not-allowed' : ''}
+          title={isAtLimit ? 'Daily limit reached (5 tasks)' : 'Add task'}
         >
           <Plus className="h-4 w-4" />
         </Button>
