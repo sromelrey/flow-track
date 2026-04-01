@@ -90,8 +90,8 @@ export async function createTask(input: CreateTaskInput): Promise<TaskResult> {
         title: task.title,
         completed: task.completed || false,
         taskDate: new Date(task.taskDate),
-        createdAt: new Date(task.createdAt),
-        updatedAt: new Date(task.updatedAt),
+        createdAt: task.createdAt || new Date(),
+        updatedAt: task.updatedAt || new Date(),
         typeId: task.typeId!,
         taskType: task.typeId ? {
           id: task.typeId!,
@@ -140,8 +140,60 @@ export async function getTaskTypes() {
   }
 }
 
+export async function toggleTask(taskId: string) {
+  try {
+    // Get current task state
+    const [currentTask] = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+
+    if (!currentTask) {
+      return { success: false, error: 'Task not found' };
+    }
+
+    // Toggle completed status
+    const [updatedTask] = await db
+      .update(tasks)
+      .set({ 
+        completed: !currentTask.completed,
+        updatedAt: new Date()
+      })
+      .where(eq(tasks.id, taskId))
+      .returning();
+
+    // Revalidate dashboard cache
+    revalidatePath('/dashboard');
+    revalidatePath('/tasks');
+
+    return { 
+      success: true, 
+      task: {
+        id: updatedTask.id,
+        userId: updatedTask.userId,
+        title: updatedTask.title,
+        completed: updatedTask.completed,
+        taskDate: new Date(updatedTask.taskDate),
+        createdAt: updatedTask.createdAt || new Date(),
+        updatedAt: updatedTask.updatedAt || new Date(),
+        typeId: updatedTask.typeId,
+      }
+    };
+  } catch (error) {
+    console.error('Failed to toggle task:', error);
+    return { success: false, error: 'Failed to update task' };
+  }
+}
+
 export async function getTasksByDate(date: Date) {
   try {
+    console.log('getTasksByDate: Fetching for date:', date.toISOString());
+    
+    // Convert to date string (YYYY-MM-DD) for comparison
+    const dateStr = date.toISOString().split('T')[0];
+    console.log('getTasksByDate: Date string for comparison:', dateStr);
+    
     const tasksWithTypes = await db
       .select({
         id: tasks.id,
@@ -158,27 +210,35 @@ export async function getTasksByDate(date: Date) {
       .leftJoin(taskTypes, eq(tasks.typeId, taskTypes.id))
       .where(and(
         eq(tasks.userId, MOCK_USER_ID),
-        sql`${tasks.taskDate} = ${date.toISOString()}`
+        sql`DATE(${tasks.taskDate}) = DATE(${dateStr})`
       ))
       .orderBy(tasks.createdAt);
 
-    return tasksWithTypes.map(task => ({
-      id: task.id,
-      userId: MOCK_USER_ID,
-      title: task.title,
-      completed: task.completed ?? false,
-      taskDate: new Date(task.taskDate),
-      createdAt: task.createdAt ?? new Date(),
-      updatedAt: task.updatedAt ?? new Date(),
-      typeId: task.typeId!,
-      taskType: task.typeId ? {
-        id: task.typeId!,
-        name: task.typeName!,
-        color: task.typeColor!,
-        userId: null,
-        createdAt: new Date()
-      } : undefined
-    }));
+    console.log('getTasksByDate: Raw DB result:', tasksWithTypes);
+
+    const result = tasksWithTypes.map(task => {
+      console.log('Processing task:', task);
+      return {
+        id: task.id,
+        userId: MOCK_USER_ID,
+        title: task.title,
+        completed: task.completed ?? false,
+        taskDate: new Date(task.taskDate),
+        createdAt: task.createdAt || new Date(),
+        updatedAt: task.updatedAt || new Date(),
+        typeId: task.typeId || '',
+        taskType: task.typeId ? {
+          id: task.typeId,
+          name: task.typeName || '',
+          color: task.typeColor || '',
+          userId: null,
+          createdAt: new Date()
+        } : undefined
+      };
+    });
+
+    console.log('getTasksByDate: Final result:', result);
+    return result;
   } catch (error) {
     console.error('Failed to get tasks:', error);
     return [];
