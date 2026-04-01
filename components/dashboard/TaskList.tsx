@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { TaskForm } from '@/components/TaskForm';
-import { getTasksByDate } from '@/app/actions/tasks';
+import { getTasksByDate, toggleTask } from '@/app/actions/tasks';
 import { Task } from '@/lib/types';
+import { toast } from 'sonner';
 
 const getCategoryColor = (category: string): string => {
   switch (category) {
@@ -26,6 +27,11 @@ const getCategoryColor = (category: string): string => {
 export function TaskList() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Calculate completed tasks
+  const completedCount = tasks.filter(task => task.completed).length;
+  const totalCount = tasks.length;
+  const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const loadTasks = async () => {
     setLoading(true);
@@ -67,9 +73,28 @@ export function TaskList() {
     loadTasks();
   };
 
-  const toggleTask = async (taskId: string) => {
-    // TODO: Implement toggle functionality
-    console.log('Toggle task:', taskId);
+  const handleToggleTask = async (taskId: string) => {
+    const result = await toggleTask(taskId);
+    
+    if (result.success) {
+      // Update the task in local state
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task.id === taskId 
+            ? { ...task, completed: !task.completed }
+            : task
+        )
+      );
+      
+      const task = tasks.find(t => t.id === taskId);
+      if (task?.completed) {
+        toast.success('✅ Task completed!');
+      } else {
+        toast.success('Task marked as incomplete');
+      }
+    } else {
+      toast.error(result.error || 'Failed to update task');
+    }
   };
 
   return (
@@ -81,10 +106,27 @@ export function TaskList() {
         <TaskForm onTaskCreated={handleTaskCreated} />
       </div>
       
-      {/* Task Count */}
-      <div className="text-sm text-gray-500 mb-3">
-        {tasks.length}/5 tasks
+      {/* Task Count and Progress */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm text-gray-500">
+          {completedCount}/{totalCount} tasks completed
+        </div>
+        {totalCount > 0 && (
+          <div className="text-sm font-medium text-green-600">
+            {completionPercentage}%
+          </div>
+        )}
       </div>
+      
+      {/* Progress Bar */}
+      {totalCount > 0 && (
+        <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
+          <div 
+            className="bg-green-500 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${completionPercentage}%` }}
+          />
+        </div>
+      )}
       
       {/* Tasks List */}
       <div className="space-y-3">
@@ -96,14 +138,18 @@ export function TaskList() {
           tasks.map((task) => (
             <div
               key={task.id}
-              className={`flex items-center p-3 rounded-lg border ${
+              onClick={() => handleToggleTask(task.id)}
+              className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
                 task.completed 
                   ? 'bg-gray-50 border-gray-200' 
-                  : 'bg-white border-gray-300 hover:border-gray-400'
-              } transition-all`}
+                  : 'bg-white border-gray-300 hover:border-gray-400 hover:shadow-sm'
+              }`}
             >
               <button
-                onClick={() => toggleTask(task.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleTask(task.id);
+                }}
                 className={`shrink-0 w-5 h-5 rounded border-2 mr-3 flex items-center justify-center transition-colors ${
                   task.completed
                     ? 'bg-green-500 border-green-500'
@@ -114,7 +160,7 @@ export function TaskList() {
               </button>
               
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${
+                <p className={`text-sm font-medium select-none ${
                   task.completed ? 'text-gray-500 line-through' : 'text-gray-900'
                 }`}>
                   {task.title}
@@ -143,7 +189,7 @@ export function TaskList() {
       {!loading && tasks.length >= 5 && (
         <div className="text-center py-4">
           <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded">
-            Daily task limit reached (5/5)
+            📋 Daily task limit reached (5/5). Great job staying focused!
           </p>
         </div>
       )}
