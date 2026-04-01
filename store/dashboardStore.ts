@@ -9,9 +9,14 @@ const generateMockActivityData = (): ActivityData[] => {
   for (let i = 29; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
+    
+    // Use date as seed to ensure same value on server and client
+    const seed = date.getDate() + date.getMonth() * 31;
+    const random = (seed * 9301 + 49297) % 233280 / 233280;
+    
     data.push({
       date,
-      count: Math.floor(Math.random() * 10) + 1
+      count: Math.floor(random * 10) + 1
     });
   }
   
